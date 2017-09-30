@@ -9,12 +9,15 @@
 
  int main(void)
 {
-        int     fd[2], nbytes;
+        int     fd[2],sfd[2] ,nbytes;
         pid_t   childpid;
         char buffer[CHUNK];
         //char    string[] = "Hello, world!\n";
         char    readbuffer[CHUNK];
         //char ch;
+        char recstring[25];
+
+
 
         //count words
         int count = 0, c = 0, i, j = 0, k, space = 0;
@@ -22,6 +25,7 @@
         char *ptr;
 
         pipe(fd);
+        pipe(sfd);
 
         if((childpid = fork()) == -1)
         {
@@ -33,6 +37,7 @@
         {
                 /* child process closes up output side of pipe */
                 close(fd[1]);
+                close(sfd[0]);
 
                 /* Read in a string from the pipe */
                 while(read(fd[0], readbuffer,sizeof(readbuffer)) != 0){
@@ -73,7 +78,15 @@
                             if(strcmp(ptr1[i],p[j]) ==0)
                                 c++;
                         }
-                        printf("%s %d times\n",ptr1[i],c);
+                        //printf("%s %d times\n",ptr1[i],c);
+
+                        char num[10];
+                        sprintf(num,"%d", c);
+
+
+                        write(sfd[1],ptr1[i],strlen(ptr1)+1);
+                        write(sfd[1],num,strlen(num)+1);
+                        //write(sfd[1]," ",20);
                         c=0;
                     }
                 }
@@ -87,6 +100,7 @@
         {
                 /* parent process closes up input side of pipe */
                 close(fd[0]);
+                close(sfd[1]);
 
                 FILE *fp;
 
@@ -99,6 +113,11 @@
                 while (fgets(buffer, sizeof(buffer), fp) != NULL){
                     //printf("%s", buffer);
                     write(fd[1], buffer, CHUNK);
+
+                    if(read(sfd[0],recstring,sizeof(recstring) )< 0){
+                        break;
+                    }
+                    printf("%s ",recstring);
                 }
                 fclose(fp);
 
