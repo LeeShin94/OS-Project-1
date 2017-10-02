@@ -1,4 +1,4 @@
 # OS-Project-1-1 pipe
-1. two pipes were created for two-way conversation between child and parent.
-2. count each unique word in ANNA.txt file, the time consumed was 87 seconds.
-3. the method we used to count words is structures. We store words by its content and count of frequency.
+1. Two pipes were created for two-way conversation between child and parent.
+2. Count each unique word in ANNA.txt file, the time consumed was 87 seconds.
+3. We used structure to store list of each word's frequency and its content. The child sent the counted results to parent and printed out on screen.
