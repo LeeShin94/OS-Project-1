@@ -1,137 +1,200 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <string.h>
 
-#define CHUNK 9128
+#include <assert.h>
+#define MAXWORDLEN 128
 
+const char* findWhitespace(const char* text)
+    {
+        while (*text && !isspace(*text))
+            text++;
+        return text;
+    }
 
- int main(void)
+    const char* findNonWhitespace(const char* text)
+    {
+        while (*text && isspace(*text))
+            text++;
+        return text;
+    }
+
+    typedef struct tagWord
+    {
+        char word[MAXWORDLEN + 1];
+        int count;
+    } Word;
+
+    typedef struct tagWordList
+    {
+        Word* words;
+        int count;
+    } WordList;
+
+    WordList* createWordList(unsigned int count);
+
+    void extendWordList(WordList* wordList, const int count)
+    {
+        Word* newWords = (Word*)malloc(sizeof(Word) * (wordList->count + count));
+        if (wordList->words != NULL) {
+            memcpy(newWords, wordList->words, sizeof(Word)* wordList->count);
+            free(wordList->words);
+        }
+        for (int i = wordList->count; i < wordList->count + count; i++) {
+            newWords[i].word[0] = '\0';
+            newWords[i].count = 0;
+        }
+        wordList->words = newWords;
+        wordList->count += count;
+    }
+
+    void addWord(WordList* wordList, const char* word)
+    {
+        assert(strlen(word) <= MAXWORDLEN);
+        extendWordList(wordList, 1);
+        Word* wordNode = &wordList->words[wordList->count - 1];
+        strcpy(wordNode->word, word);
+        wordNode->count++;
+    }
+
+    Word* findWord(WordList* wordList, const char* word)
+    {
+        for(int i = 0; i < wordList->count; i++) {
+            if (strcmp(word, wordList->words[i].word) == 0) {
+                return &wordList->words[i];
+            }
+        }
+        return NULL;
+    }
+
+    void updateWordList(WordList* wordList, const char* word)
+    {
+        Word* foundWord = findWord(wordList, word);
+        if (foundWord == NULL) {
+            addWord(wordList, word);
+        } else {
+            foundWord->count++;
+        }
+    }
+
+    WordList* createWordList(unsigned int count)
+    {
+        WordList* wordList = (WordList*)malloc(sizeof(WordList));
+        if (count > 0) {
+            wordList->words = (Word*)malloc(sizeof(Word) * count);
+            for(unsigned int i = 0; i < count; i++) {
+                wordList->words[i].count = 0;
+                wordList->words[i].word[0] = '\0';
+            }
+        }
+        else {
+            wordList->words = NULL;
+        }
+        wordList->count = count;
+        return wordList;
+    }
+
+    /*void printWords(WordList* wordList)
+    {
+        for (int i = 0; i < wordList->count; i++) {
+            printf("%s: %d\n", wordList->words[i].word, wordList->words[i].count);
+        }
+    }*/
+
+    int compareWord(const void* vword1, const void* vword2)
+    {
+        Word* word1 = (Word*)vword1;
+        Word* word2 = (Word*)vword2;
+        return strcmp(word1->word, word2->word);
+    }
+
+    void sortWordList(WordList* wordList)
+    {
+        qsort(wordList->words, wordList->count, sizeof(Word), compareWord);
+    }
+
+int main()
 {
-        int     fd[2],sfd[2] ,nbytes;
-        pid_t   childpid;
-        char buffer[CHUNK];
-        //char    string[] = "Hello, world!\n";
-        char    readbuffer[CHUNK];
-        //char ch;
-        char recstring[25];
+    int fd[2],bfd[2];
+    pid_t childpid;
+    char string[1024];
+    char readbuffer[4096];
+    char recreadbuffer[4096];
 
+    pipe(fd);
+    pipe(bfd);
 
+    if((childpid = fork()) == -1){
+        perror("fork");
+        exit(1);
+    }
 
-        //count words
-        int count = 0, c = 0, i, j = 0, k, space = 0;
-        char p[1000][512], str1[512], ptr1[1000][512];
-        char *ptr;
+    if(childpid == 0){
+        close(fd[1]);
+        close(bfd[0]);
 
-        pipe(fd);
-        pipe(sfd);
+        while(read(fd[0], readbuffer, sizeof(readbuffer))>0){
+            //printf("%s",readbuffer);
+            WordList   *wordList = createWordList(0);
+            Word       *foundWord = NULL;
+            const char *beg = findNonWhitespace(readbuffer);
+            const char *end;
+            char       word[MAXWORDLEN];
 
-        if((childpid = fork()) == -1)
-        {
-                perror("fork");
-                exit(1);
-        }
-
-        if(childpid == 0)
-        {
-                /* child process closes up output side of pipe */
-                close(fd[1]);
-                close(sfd[0]);
-
-                /* Read in a string from the pipe */
-                while(read(fd[0], readbuffer,sizeof(readbuffer)) != 0){
-
-                    //printf("%s",readbuffer);
-                    for (i = 0;i<strlen(readbuffer);i++){
-                        if ((readbuffer[i] == ' ')||(readbuffer[i] ==',')||(readbuffer[i] == '.')){
-                            space++;
-                        }
-                    }
-                    for (i=0,j=0,k=0;j<strlen(readbuffer);j++){
-                        if ((readbuffer[j]==' ')||(readbuffer[j] == 44)||(readbuffer[j] == 46)){
-                            p[i][k] = '\0';
-                            i++;
-                            k = 0;
-                        }else{
-                            p[i][k++] = readbuffer[j];
-                        }
-                    }
-                    k = 0;
-                    for(i=0;i<= space;i++){
-                        for(j=0;j<=space;j++){
-                            if(i==j){
-                                strcpy(ptr1[k],p[i]);
-                                k++;
-                                count++;
-                                break;
-                            }else{
-                                if(strcmp(ptr1[j],p[i])!=0)
-                                    continue;
-                                else
-                                    break;
-                            }
-                        }
-                    }
-                    for (i=0;j<=space;j++){
-                        for(j=0;j<space;j++){
-                            if(strcmp(ptr1[i],p[j]) ==0)
-                                c++;
-                        }
-                        //printf("%s %d times\n",ptr1[i],c);
-
-                        char num[10];
-                        sprintf(num,"%d", c);
-
-
-                        write(sfd[1],ptr1[i],strlen(ptr1)+1);
-                        write(sfd[1],num,strlen(num)+1);
-                        //write(sfd[1]," ",20);
-                        c=0;
-                    }
+            while (beg && *beg) {
+                end = findWhitespace(beg);
+                if (*end) {
+                    assert(end - beg <= MAXWORDLEN);
+                    strncpy(word, beg, end - beg);
+                    word[end - beg] = '\0';
+                    updateWordList(wordList, word);
+                    beg = findNonWhitespace(end);
                 }
-                /*
-                nbytes = read(fd[0], readbuffer, sizeof(readbuffer));
-                printf("Received string: %s", readbuffer);*/
+                else {
+                    beg = NULL;
+                }
+            }
+
+            sortWordList(wordList);
+            //printWords(wordList);
+            for (int i = 0; i < wordList->count; i++) {
+                //printf("%s: %d\n", wordList->words[i].word, wordList->words[i].count);
+                write(bfd[1],wordList->words[i].word,strlen(wordList->words[i].word));
+                write(bfd[1]," : ",5);
+                //char num = (char)wordList->words[i].count;
+                //write(bfd[1],&wordList->words[i].count,sizeof(wordList->words[i].count));
+
+            }
+
+        }
+        //close(fd[0]);
+        //close(bfd[1]);
+    }else{
+    //parent
+
+    close(fd[0]); //close input side of pipe
+    close(bfd[1]);
+    FILE * file;
+    file = fopen("ANNA.txt", "r");
+    if (file) {
+        while (fgets(string, sizeof(string), file)!= NULL){
+            write(fd[1], string, (strlen(string)));
+            if(read(bfd[0], recreadbuffer, sizeof(recreadbuffer))>0){
+                printf("%s",recreadbuffer);
+            }
 
 
         }
-        else
-        {
-                /* parent process closes up input side of pipe */
-                close(fd[0]);
-                close(sfd[1]);
+        fclose(file);
 
-                FILE *fp;
-
-                fp = fopen("ANNA.txt", "r");
-
-                if(fp ==NULL){
-                    perror("open error\n");
-                    exit(EXIT_FAILURE);
-                }
-                while (fgets(buffer, sizeof(buffer), fp) != NULL){
-                    //printf("%s", buffer);
-                    write(fd[1], buffer, CHUNK);
-
-                    if(read(sfd[0],recstring,sizeof(recstring) )< 0){
-                        break;
-                    }
-                    printf("%s ",recstring);
-                }
-                fclose(fp);
+        //close(fd[1]);
+        //close(bfd[0]);
+        //wait(0);
+    }
 
 
-                /*while((ch = fgetc(fp)) != EOF){
-                    //printf("%c", ch);
-
-
-                }*/
-
-                /* Send "string" through the output side of pipe */
-                //write(fd[1], string, (strlen(string)+1));
-                exit(0);
-        }
-
-        return(0);
+    }
+    return 0;
 }
