@@ -162,7 +162,9 @@ int main()
             for (int i = 0; i < wordList->count; i++) {
                 //printf("%s: %d\n", wordList->words[i].word, wordList->words[i].count);
                 write(bfd[1],wordList->words[i].word,strlen(wordList->words[i].word));
-                write(bfd[1]," : ",5);
+                char buffer[50];
+                int n = sprintf(buffer," : %d ",wordList->words[i].count);
+                write(bfd[1],buffer,n);
                 //char num = (char)wordList->words[i].count;
                 //write(bfd[1],&wordList->words[i].count,sizeof(wordList->words[i].count));
 
